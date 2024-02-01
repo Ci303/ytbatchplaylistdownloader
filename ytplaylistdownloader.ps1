@@ -18,14 +18,15 @@ if ($chocoPath -eq $null) {
 }
 
 # Check and update yt-dlp using Chocolatey
-$ytDlpPath = Get-Command yt-dlp.exe -ErrorAction SilentlyContinue
+$ytDlpPathCommand = Get-Command yt-dlp.exe -ErrorAction SilentlyContinue
 $ytDlpVersion = $null  # Initialize $ytDlpVersion
 
-if ($ytDlpPath -eq $null) {
+if ($ytDlpPathCommand -eq $null) {
     Write-Host "Installing yt-dlp..."
     choco install yt-dlp -y
 } else {
-    Write-Host "yt-dlp is already installed."
+    $ytDlpPath = $ytDlpPathCommand.Source
+    Write-Host "yt-dlp is already installed. Path: $ytDlpPath"
     # Set $ytDlpVersion if yt-dlp is already installed
     $ytDlpVersion = & $ytDlpPath --version
 }
@@ -41,19 +42,20 @@ if ($ytDlpPath -ne $null -and $ytDlpVersion -ne $latestVersion) {
 }
 
 # Check and install ffmpeg using Chocolatey
-$ffmpegPath = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+$ffmpegPathCommand = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
 
-if ($ffmpegPath -eq $null) {
+if ($ffmpegPathCommand -eq $null) {
     choco install ffmpeg -y
 } else {
-    Write-Host "ffmpeg is already installed."
+    $ffmpegPath = $ffmpegPathCommand.Source
+    Write-Host "ffmpeg is already installed. Path: $ffmpegPath"
 }
 
 # Check and update ffmpeg if outdated using Chocolatey
 $ffmpegVersionOutput = & $ffmpegPath -version
 
-# Extracting version from output
-$ffmpegVersion = $ffmpegVersionOutput | Select-String -Pattern 'version\s\d+\.\d+\.\d+' | ForEach-Object { $_.Matches[0].Value -replace 'version ' }
+# Extracting version using a more robust method
+$ffmpegVersion = ($ffmpegVersionOutput | Select-String -Pattern 'version\s\d+\.\d+\.\d+' -AllMatches).Matches.Value
 
 $latestFfmpegVersion = ((choco list --local-only ffmpeg).Split('|')[1]).Trim()
 
@@ -62,11 +64,10 @@ if ($ffmpegVersion -ne $latestFfmpegVersion) {
     choco upgrade ffmpeg -y
     # Re-check version after upgrade
     $ffmpegVersionOutput = & $ffmpegPath -version
-    $ffmpegVersion = $ffmpegVersionOutput | Select-String -Pattern 'version\s\d+\.\d+\.\d+' | ForEach-Object { $_.Matches[0].Value -replace 'version ' }
+    # Extracting version using a more robust method after upgrade
+    $ffmpegVersion = ($ffmpegVersionOutput | Select-String -Pattern 'version\s\d+\.\d+\.\d+' -AllMatches).Matches.Value
 }
 
-$ffmpegPath = "C:\ProgramData\chocolatey\bin\ffmpeg.exe"
-$ytdlpPath = "C:\ProgramData\chocolatey\bin\yt-dlp.exe"
 $downloadPath = "$env:userprofile\Desktop\YouTube"
 
 # Function to sanitize a string for file names
@@ -121,7 +122,7 @@ while ($true) {
     } until (Validate-URL $playlistUrl)
 
     # Download and process videos
-    $playlistInfo = & $ytdlpPath --dump-json --flat-playlist $playlistUrl
+    $playlistInfo = & $ytDlpPath --dump-json --flat-playlist $playlistUrl
     $playlist = $playlistInfo | ConvertFrom-Json
 
     # Debug output
@@ -138,7 +139,7 @@ while ($true) {
         $sanitizedTitle = Sanitize-FileName $videoTitle
         $outputFileName = "$downloadPath\$sanitizedTitle.%(ext)s"
 
-        & $ytdlpPath --yes-playlist --sponsorblock-remove all --windows-filenames --remux-video mkv --audio-quality 0 --ffmpeg-location $ffmpegPath $video.url -o "$downloadPath/%(title)s.%(ext)s"
+        & $ytDlpPath --yes-playlist --sponsorblock-remove all --windows-filenames --remux-video mkv --audio-quality 0 --ffmpeg-location $ffmpegPath $video.url -o "$downloadPath/%(title)s.%(ext)s"
         # --write-thumbnail --embed-thumbnail  --add-metadata --merge-output-format mkv --audio-format mp3 --no-check-certificate --sponsorblock-mark all --no-write-comment --format bestvideo+bestaudio/best
     }
 
