@@ -122,10 +122,6 @@ do {
         # Download and process videos
         $playlistInfo = & $ytdlpPath --dump-json --flat-playlist $playlistUrl
         $playlist = $playlistInfo | ConvertFrom-Json
-
-        # Debug output
-        Write-Host "Total Videos: $playlist.Count"
-
         $totalVideos = $playlist.Count
         $processedVideos = 0
 
